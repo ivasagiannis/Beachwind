@@ -1,2 +1,3 @@
 # Beachwind
-Test for beaches
+Ioannis Vasagiannis
+Check Wind for swimming
