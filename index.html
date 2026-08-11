@@ -171,7 +171,7 @@
     <h3>Wind threshold</h3>
     <div class="mng" style="padding:14px 16px">
       <label style="font-size:.85rem;font-weight:600">✅ when onshore wind is below<br><span id="calmVal" style="color:var(--sea)"></span></label>
-      <input type="range" id="calmSlider" min="0" max="10" step="1">
+      <input type="range" id="calmSlider" min="0" max="28" step="1">
       <div style="font-size:.75rem;color:var(--muted)">⚠️ up to ~11 km/h above that · ❌ beyond. Lower = stricter.</div>
     </div>
     <h3>My beaches</h3>
@@ -201,9 +201,9 @@ try{
   unit = localStorage.getItem("unit")||"bft";
   maxDrive = +(localStorage.getItem("maxDrive")||40);
   calmKmh = localStorage.getItem("calmKmh")!=null ? +localStorage.getItem("calmKmh")
-          : localStorage.getItem("calmLimit")!=null ? Math.min(10,Math.round(+localStorage.getItem("calmLimit")*1.852))
-          : 8;
-}catch(e){ beaches=JSON.parse(JSON.stringify(DEFAULTS)); unit="bft"; maxDrive=40; calmKmh=8; }
+          : localStorage.getItem("calmLimit")!=null ? Math.min(28,Math.round(+localStorage.getItem("calmLimit")*1.852))
+          : 5;
+}catch(e){ beaches=JSON.parse(JSON.stringify(DEFAULTS)); unit="bft"; maxDrive=40; calmKmh=5; }
 // Migrate beaches saved before multi-facing support
 beaches=beaches.map(b=>({...b,facings:b.facings||(b.facing!=null?[b.facing]:[180])}));
 
