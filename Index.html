@@ -419,6 +419,7 @@ function renderSettings(){
       <span class="f">faces ${nearestCompass(b.facing)}</span>
       <button class="del" onclick="delBeach('${b.id}')">✕</button>
     </div>`).join("");
+  
 }
 function delBeach(id){
   beaches=beaches.filter(b=>b.id!==id);
