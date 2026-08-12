@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>BeachWind · Ermionida</title>
+<!-- Made by Ioannis Vasagiannis -->
+<meta name="author" content="Ioannis Vasagiannis">
 <meta name="theme-color" content="#0B3550">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -187,14 +189,15 @@
       Upload it to GitHub (replace the old index.html) and every new visitor starts with your beaches.
     </p>
     <p style="font-size:.72rem;color:var(--muted);margin-top:18px;text-align:center">
-      Wind &amp; waves: Open-Meteo · Drive times: OSRM/OpenStreetMap
+      Wind: Open-Meteo · Drive times: OSRM/OpenStreetMap<br>
+      © <span id="crYear"></span> Ioannis Vasagiannis
     </p>
   </div>
 </div>
 
 <script>
 // ---------- Data ----------
-const DEFAULTS=/*BEACHES_START*/[{"id":"d0","name":"Σαλάντι","lat":37.44627,"lon":23.12496,"facings":[270,225]},{"id":"d1","name":"Θυνί","lat":37.38835060770004,"lon":23.081277608871464,"facings":[0,45,315]},{"id":"d2","name":"Kορακιά","lat":37.36417,"lon":23.07515,"facings":[270,315]},{"id":"d3","name":"Κουβέρτα","lat":37.35338,"lon":23.24858,"facings":[45,0]},{"id":"d5","name":"Πετροθάλασσα","lat":37.34612,"lon":23.22351,"facings":[180]},{"id":"d6","name":"Malindi & Salty","lat":37.33752471717905,"lon":23.125501871109012,"facings":[270,315]},{"id":"d8","name":"Κουνούπια","lat":37.30885,"lon":23.1952,"facings":[45,90]},{"id":"d9","name":"Ταβέρνα της Γιαγιάς","lat":37.30264,"lon":23.1452,"facings":[270,225]},{"id":"d12","name":"Λιμανάκια","lat":37.29484716044522,"lon":23.181817531585697,"facings":[180]},{"id":"d13","name":"Κόβα","lat":37.29055,"lon":23.16542,"facings":[270,225,315]},{"id":"u1786480506922","name":"Σεντόνι","lat":37.34633025686077,"lon":23.233180046081532,"facings":[180]},{"id":"u1786487564109","name":"ΠουΓου","lat":37.35015978998727,"lon":23.11159551143645,"facings":[180,225,270]},{"id":"u1786487697300","name":"Λεπίτσα","lat":37.41071405687917,"lon":23.11303496360779,"facings":[270,225]},{"id":"u1786487791221","name":"Σαλάντι Άι Γιάννης","lat":37.45398866920189,"lon":23.10436606407166,"facings":[180,225]}]/*BEACHES_END*/;
+const DEFAULTS=/*BEACHES_START*/[{"id":"d0","name":"Σαλάντι","lat":37.44627,"lon":23.12496,"facings":[270,225]},{"id":"d1","name":"Θυνί","lat":37.38835060770004,"lon":23.081277608871464,"facings":[0,45,315]},{"id":"d2","name":"Kορακιά","lat":37.36417,"lon":23.07515,"facings":[270]},{"id":"d3","name":"Κουβέρτα","lat":37.35338,"lon":23.24858,"facings":[45,0]},{"id":"d5","name":"Πετροθάλασσα","lat":37.34612,"lon":23.22351,"facings":[180]},{"id":"d6","name":"Salty & Malindi","lat":37.33752471717905,"lon":23.125501871109012,"facings":[270,315]},{"id":"d8","name":"Κουνούπια","lat":37.30885,"lon":23.1952,"facings":[45,90]},{"id":"d9","name":"Ταβέρνα της Γιαγιάς","lat":37.30264,"lon":23.1452,"facings":[270,225]},{"id":"d12","name":"Λιμανάκια","lat":37.29484716044522,"lon":23.181817531585697,"facings":[180]},{"id":"d13","name":"Κόβα","lat":37.29055,"lon":23.16542,"facings":[270,225]},{"id":"u1786480506922","name":"Σεντόνι","lat":37.34633025686077,"lon":23.233180046081532,"facings":[180]},{"id":"u1786487564109","name":"ΠουΓου","lat":37.35015978998727,"lon":23.11159551143645,"facings":[180,225]},{"id":"u1786487697300","name":"Λεπίτσα","lat":37.41071405687917,"lon":23.11303496360779,"facings":[270,225]},{"id":"u1786487791221","name":"Σαλάντι Άι Γιάννης","lat":37.45398866920189,"lon":23.10436606407166,"facings":[180]}]/*BEACHES_END*/;
 
 const COMPASS=[["N",0],["NE",45],["E",90],["SE",135],["S",180],["SW",225],["W",270],["NW",315]];
 
@@ -378,9 +381,9 @@ function render(){
   });
   if(!html) html=`<div class="loading">No beaches within ${maxDrive} min — try a longer drive.</div>`;
   document.getElementById("list").innerHTML=html;
-  document.getElementById("updated").textContent=lastUpdated
-    ? "Updated "+lastUpdated.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})+" · sand arc = shore · blue arrow = wind"
-    : "";
+  document.getElementById("updated").innerHTML=(lastUpdated
+    ? "Updated "+lastUpdated.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})+" · sand arc = shore · blue arrow = wind<br>"
+    : "")+"© "+new Date().getFullYear()+" Ioannis Vasagiannis · Made with 🏖️ in Ermionida";
 }
 const esc=s=>s.replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 
@@ -562,7 +565,7 @@ document.getElementById("btnRefresh").onclick=refresh;
 document.getElementById("maxDrive").oninput=e=>{
   maxDrive=+e.target.value; persist(); render();
 };
-
+document.getElementById("crYear").textContent=new Date().getFullYear();
 refresh();
 </script>
 </body>
