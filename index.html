@@ -48,6 +48,37 @@
   }
   main{max-width:520px; margin:0 auto; padding:14px 14px 40px}
 
+  .controls{
+    position:sticky; top:calc(66px + env(safe-area-inset-top)); z-index:40;
+    background:var(--card); border-radius:16px; padding:10px 14px;
+    box-shadow:0 2px 8px rgba(11,53,80,.12); margin-bottom:16px;
+  }
+  .tabs{display:grid; grid-template-columns:repeat(3,1fr); gap:5px; margin-bottom:8px}
+  .tabs button{padding:8px 0; border:1px solid rgba(11,53,80,.15); background:var(--foam);
+    border-radius:10px; font-weight:600; font-size:.78rem; color:var(--ink); cursor:pointer}
+  .tabs button.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .ctl-row{display:flex; align-items:center; gap:8px; margin-top:2px}
+  .ctl-row input[type=range]{flex:1; height:28px}
+  .ctl-val{font-size:.75rem; font-weight:700; color:var(--ink); min-width:56px; text-align:right}
+  .ctl-ico{font-size:.85rem}
+  .chip{border:1px solid rgba(11,53,80,.2); background:var(--foam); color:var(--ink);
+    border-radius:999px; padding:5px 11px; font-size:.72rem; font-weight:700; cursor:pointer}
+  .chip.on{background:var(--sea); color:#fff; border-color:var(--sea)}
+  #dmap{flex:1}
+  .d-info{background:var(--card); padding:12px 16px calc(14px + env(safe-area-inset-bottom))}
+  .d-verdict{font-weight:600; font-size:.95rem; margin-bottom:8px}
+  .d-time{display:flex; align-items:center; gap:8px}
+  .d-time input[type=range]{flex:1}
+  .d-time .ctl-val{min-width:86px}
+  .warrow{pointer-events:none}
+  .warrow .rot{display:block; transform-origin:center}
+  .warrow .drift{display:block; animation:drift linear infinite}
+  @keyframes drift{
+    0%{transform:translateY(6px); opacity:.25}
+    25%{opacity:1}
+    75%{opacity:1}
+    100%{transform:translateY(-6px); opacity:.25}
+  }
   .slider-card{
     background:var(--card); border-radius:16px; padding:14px 16px 10px;
     box-shadow:0 1px 4px rgba(11,53,80,.08); margin-bottom:16px;
@@ -140,13 +171,39 @@
 
 <main>
   <div class="banner" id="banner"></div>
-  <div class="slider-card">
-    <label>Max drive: <span class="val" id="maxDriveVal">40</span> min</label>
-    <input type="range" id="maxDrive" min="15" max="90" step="5" value="40">
+  <div class="controls">
+    <div class="tabs" id="dayTabs"></div>
+    <div class="ctl-row">
+      <button class="chip" id="btnNow">Now</button>
+      <input type="range" id="hourSlider" min="6" max="21" step="1">
+      <span class="ctl-val" id="hourVal"></span>
+    </div>
+    <div class="ctl-row">
+      <span class="ctl-ico">🚗</span>
+      <input type="range" id="maxDrive" min="15" max="90" step="5" value="40">
+      <span class="ctl-val" id="maxDriveVal"></span>
+    </div>
   </div>
   <div id="list"><div class="loading"><span class="spin">🌀</span> Checking the wind…</div></div>
   <div class="updated" id="updated"></div>
 </main>
+
+<!-- Beach detail sheet -->
+<div class="sheet" id="detailSheet">
+  <div class="sheet-head">
+    <button onclick="closeDetail()">‹ Back</button>
+    <h2 id="dTitle">Beach</h2>
+    <button class="primary" onclick="editFromDetail()">Edit</button>
+  </div>
+  <div id="dmap"></div>
+  <div class="d-info">
+    <div class="d-verdict" id="dVerdict"></div>
+    <div class="d-time">
+      <input type="range" id="dSlider" min="0" max="71" step="1">
+      <span class="ctl-val" id="dTimeVal"></span>
+    </div>
+  </div>
+</div>
 
 <!-- Add beach sheet -->
 <div class="sheet" id="addSheet">
@@ -237,8 +294,32 @@ function scoreWind(b,windKn,dir){
   return 2;
 }
 function verdict(b){
-  const c=conditions[b.id]; if(!c)return 1;
+  const c=condAt(b); if(!c)return 1;
   return scoreWind(b,c.wind,c.dir);
+}
+
+// ---------- Time selection (day tabs + hour slider) ----------
+let selDay=0, selHour=null; // selHour null = "now" (only valid when selDay 0)
+function isNowMode(){ return selDay===0 && selHour===null; }
+function hourlyIdx(b,day,hour){
+  const c=conditions[b.id];
+  if(!c||!c.hourly)return -1;
+  const i=day*24+hour;
+  return (i>=0&&i<c.hourly.wind.length)?i:-1;
+}
+// Conditions at the selected moment (current data in now-mode, forecast otherwise)
+function condAt(b){
+  const c=conditions[b.id]; if(!c)return null;
+  if(isNowMode()||!c.hourly)return c;
+  const i=hourlyIdx(b,selDay,selHour);
+  if(i<0)return c;
+  return {wind:c.hourly.wind[i],dir:c.hourly.dir[i],temp:c.temp};
+}
+function dayName(offset){
+  if(offset===0)return "Today";
+  if(offset===1)return "Tomorrow";
+  const d=new Date(); d.setDate(d.getDate()+offset);
+  return d.toLocaleDateString(undefined,{weekday:"long"});
 }
 function beaufort(kn){const t=[1,3,6,10,16,21,27,33,40,47,55,63];for(let i=0;i<t.length;i++)if(kn<t[i])return i;return 12;}
 const nearestCompass=d=>COMPASS.reduce((best,c)=>angleDiff(c[1],d)<angleDiff(best[1],d)?c:best)[0];
@@ -251,7 +332,7 @@ function windText(c){
 // ---------- Fetching ----------
 async function fetchConditions(b){
   try{
-    const wURL=`https://api.open-meteo.com/v1/forecast?latitude=${b.lat}&longitude=${b.lon}&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=wind_speed_10m,wind_direction_10m&forecast_days=1&wind_speed_unit=kn&timezone=auto`;
+    const wURL=`https://api.open-meteo.com/v1/forecast?latitude=${b.lat}&longitude=${b.lon}&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=wind_speed_10m,wind_direction_10m&forecast_days=3&wind_speed_unit=kn&timezone=auto`;
     const mURL=`https://marine-api.open-meteo.com/v1/marine?latitude=${b.lat}&longitude=${b.lon}&current=sea_surface_temperature&timezone=auto`;
     const [wR,mR]=await Promise.all([fetch(wURL),fetch(mURL).catch(()=>null)]);
     const w=await wR.json();
@@ -260,6 +341,7 @@ async function fetchConditions(b){
     let hourly=null;
     if(w.hourly&&w.hourly.time){
       hourly={
+        times:w.hourly.time,
         hours:w.hourly.time.map(t=>+t.slice(11,13)),
         wind:w.hourly.wind_speed_10m,
         dir:w.hourly.wind_direction_10m
@@ -324,7 +406,7 @@ function banner(msg){
 // Ring = the beach's cove: sand-coloured arc marks the shore side (opposite of facing).
 // Blue arrow = which way the wind is blowing right now.
 function dial(b){
-  const c=conditions[b.id]; if(!c)return "";
+  const c=condAt(b); if(!c)return "";
   const toDeg=(c.dir+180)%360; // wind blows toward
   const arcs=b.facings.map(f=>{
     const shoreDeg=(f+180)%360;
@@ -345,7 +427,16 @@ function dial(b){
 // ---------- Render ----------
 function render(){
   document.getElementById("maxDrive").value=maxDrive;
-  document.getElementById("maxDriveVal").textContent=maxDrive;
+  document.getElementById("maxDriveVal").textContent=maxDrive+" min";
+  // day tabs
+  document.getElementById("dayTabs").innerHTML=[0,1,2].map(d=>
+    `<button class="${selDay===d?'on':''}" onclick="setDay(${d})">${dayName(d)}</button>`).join("");
+  // hour slider + now chip
+  const hs=document.getElementById("hourSlider");
+  const nowH=new Date().getHours();
+  hs.value=selHour!==null?selHour:Math.min(21,Math.max(6,nowH));
+  document.getElementById("hourVal").textContent=isNowMode()?"now":`${dayName(selDay).slice(0,3)} ${String(selHour).padStart(2,"0")}:00`;
+  document.getElementById("btnNow").classList.toggle("on",isNowMode());
 
   const groups=[[],[],[]];
   beaches.forEach(b=>{
@@ -361,8 +452,8 @@ function render(){
     if(!g.length)return;
     html+=`<div class="group-title">${titles[v]}<span class="rule"></span></div>`;
     g.forEach(b=>{
-      const c=conditions[b.id], d=driveMin[b.id];
-      html+=`<div class="beach v${v}" onclick="openEditById('${b.id}')">
+      const c=condAt(b), d=driveMin[b.id];
+      html+=`<div class="beach v${v}" onclick="openDetail('${b.id}')">
         <div class="info">
           <div class="name">${esc(b.name)}</div>
           <div class="meta">
@@ -388,32 +479,30 @@ function render(){
 const esc=s=>s.replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 
 // ---------- Hourly day strip (08:00–20:00) + "until when" ----------
-function hourVerdict(b,c,h){
-  const i=c.hourly.hours.indexOf(h);
-  if(i<0)return null;
-  return scoreWind(b,c.hourly.wind[i],c.hourly.dir[i]);
-}
 function dayStrip(b){
   const c=conditions[b.id]; if(!c||!c.hourly)return "";
-  const nowH=new Date().getHours();
+  const markH=isNowMode()?new Date().getHours():(selDay===0||true)&&selHour!==null?selHour:-1;
   const cols=["var(--good)","var(--caution)","var(--bad)"];
   let spans="";
   for(let h=8;h<=20;h++){
-    const v=hourVerdict(b,c,h);
-    if(v==null)continue;
-    const now=(h===nowH)?";outline:1.5px solid var(--ink);border-radius:2px;z-index:1":"";
-    spans+=`<span style="background:${cols[v]}${now}"></span>`;
+    const i=hourlyIdx(b,selDay,h);
+    if(i<0)continue;
+    const v=scoreWind(b,c.hourly.wind[i],c.hourly.dir[i]);
+    const mark=(h===markH)?";outline:1.5px solid var(--ink);border-radius:2px;z-index:1":"";
+    spans+=`<span style="background:${cols[v]}${mark}"></span>`;
   }
   return `<div class="strip">${spans}</div><div class="striplab"><span>08:00</span><span>14:00</span><span>20:00</span></div>`;
 }
 function untilText(b){
+  if(!isNowMode())return "";
   const c=conditions[b.id]; if(!c||!c.hourly)return "";
   const nowH=new Date().getHours();
   if(nowH>=20)return "";
   const cur=scoreWind(b,c.wind,c.dir);
   for(let h=Math.max(nowH+1,8);h<=20;h++){
-    const v=hourVerdict(b,c,h);
-    if(v==null)continue;
+    const i=hourlyIdx(b,0,h);
+    if(i<0)continue;
+    const v=scoreWind(b,c.hourly.wind[i],c.hourly.dir[i]);
     if(cur===0&&v>0) return `✅ until ${h}:00`;
     if(cur>0&&v===0) return `🕐 clears at ${h}:00`;
   }
@@ -562,6 +651,114 @@ async function exportSite(){
 document.getElementById("btnAdd").onclick=openAdd;
 document.getElementById("btnSettings").onclick=openSettings;
 document.getElementById("btnRefresh").onclick=refresh;
+// ---------- Beach detail view with animated wind layer ----------
+let dMap=null, dBeachId=null, dIdx=0, dMarkers=[], dBeachMarker=null;
+const gridCache={}; // beachId -> {pts:[{lat,lon,wind[],dir[]}], times:[]}
+
+async function fetchGrid(b){
+  if(gridCache[b.id])return gridCache[b.id];
+  const off=0.045; // ~4-5 km spacing
+  const lats=[],lons=[];
+  for(const dy of[-1,0,1])for(const dx of[-1,0,1]){lats.push((b.lat+dy*off).toFixed(4));lons.push((b.lon+dx*off).toFixed(4));}
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${lats.join(",")}&longitude=${lons.join(",")}&hourly=wind_speed_10m,wind_direction_10m&forecast_days=3&wind_speed_unit=kn&timezone=auto`;
+  const r=await fetch(url);
+  const arr=await r.json();
+  const list=Array.isArray(arr)?arr:[arr];
+  const g={times:list[0].hourly.time,pts:list.map((p,i)=>({
+    lat:+lats[i],lon:+lons[i],wind:p.hourly.wind_speed_10m,dir:p.hourly.wind_direction_10m}))};
+  gridCache[b.id]=g;
+  return g;
+}
+
+function drawArrows(g){
+  dMarkers.forEach(m=>m.remove()); dMarkers=[];
+  g.pts.forEach(p=>{
+    const w=p.wind[dIdx], dir=p.dir[dIdx];
+    if(w==null)return;
+    const size=Math.min(46,14+w*2.2);                 // bigger arrow = stronger wind
+    const dur=Math.max(0.6,3.5-w*0.15).toFixed(2);    // faster drift = stronger wind
+    const html=`<span class="rot" style="transform:rotate(${(dir+180)%360}deg)">
+      <span class="drift" style="animation-duration:${dur}s">
+        <svg width="${size}" height="${size}" viewBox="0 0 24 24">
+          <path d="M12 2 L17 12 L12 9.5 L7 12 Z" fill="#0B3550" opacity=".85"/>
+          <line x1="12" y1="10" x2="12" y2="21" stroke="#0B3550" stroke-width="2.4" stroke-linecap="round" opacity=".85"/>
+        </svg>
+      </span></span>`;
+    const icon=L.divIcon({className:"warrow",html,iconSize:[size,size],iconAnchor:[size/2,size/2]});
+    dMarkers.push(L.marker([p.lat,p.lon],{icon,interactive:false}).addTo(dMap));
+  });
+}
+
+function dUpdateInfo(){
+  const b=beaches.find(x=>x.id===dBeachId); if(!b)return;
+  const c=conditions[b.id];
+  let wind=null,dir=null;
+  if(c&&c.hourly&&c.hourly.wind[dIdx]!=null){wind=c.hourly.wind[dIdx];dir=c.hourly.dir[dIdx];}
+  else if(c){wind=c.wind;dir=c.dir;}
+  if(wind!=null){
+    const v=scoreWind(b,wind,dir);
+    document.getElementById("dVerdict").innerHTML=
+      `${["✅","⚠️","❌"][v]} ${esc(b.name)} — ${windText({wind,dir}).replace("<br>"," · ")}`;
+  }
+  const g=gridCache[dBeachId];
+  const t=(g&&g.times[dIdx])||(c&&c.hourly&&c.hourly.times&&c.hourly.times[dIdx]);
+  if(t){
+    const day=Math.floor(dIdx/24);
+    document.getElementById("dTimeVal").textContent=`${dayName(day).slice(0,3)} ${t.slice(11,16)}`;
+  }
+}
+
+async function openDetail(id){
+  const b=beaches.find(x=>x.id===id); if(!b)return;
+  dBeachId=id;
+  document.getElementById("dTitle").textContent=b.name;
+  document.getElementById("detailSheet").classList.add("open");
+  if(!dMap){
+    dMap=L.map("dmap",{zoomControl:false}).setView([b.lat,b.lon],12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(dMap);
+  }else{
+    dMap.setView([b.lat,b.lon],12);
+  }
+  if(dBeachMarker)dBeachMarker.remove();
+  dBeachMarker=L.marker([b.lat,b.lon]).addTo(dMap);
+  // start at the list's selected moment
+  dIdx=isNowMode()?Math.min(23,new Date().getHours()):selDay*24+selHour;
+  document.getElementById("dSlider").value=dIdx;
+  setTimeout(()=>dMap.invalidateSize(),150);
+  dUpdateInfo();
+  try{
+    const g=await fetchGrid(b);
+    if(dBeachId===id){drawArrows(g);dUpdateInfo();}
+  }catch(e){banner("Couldn't load the wind layer — showing the map only.");}
+}
+function closeDetail(){
+  document.getElementById("detailSheet").classList.remove("open");
+  dMarkers.forEach(m=>m.remove()); dMarkers=[];
+  dBeachId=null;
+}
+function editFromDetail(){
+  const id=dBeachId;
+  closeDetail();
+  if(id)openEditById(id);
+}
+document.getElementById("dSlider").oninput=e=>{
+  dIdx=+e.target.value;
+  const g=gridCache[dBeachId];
+  if(g)drawArrows(g);
+  dUpdateInfo();
+};
+
+// ---------- List time controls ----------
+function setDay(d){
+  selDay=d;
+  if(!(d===0&&selHour===null)&&selHour===null){
+    selHour=Math.min(21,Math.max(6,new Date().getHours()));
+  }
+  render();
+}
+document.getElementById("btnNow").onclick=()=>{selDay=0;selHour=null;render();};
+document.getElementById("hourSlider").oninput=e=>{selHour=+e.target.value;render();};
+
 document.getElementById("maxDrive").oninput=e=>{
   maxDrive=+e.target.value; persist(); render();
 };
